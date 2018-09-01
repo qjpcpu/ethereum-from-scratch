@@ -1,0 +1,41 @@
+* log
+
+*** print log to stderr without any configuration
+#+BEGIN_SRC go
+package main
+
+import (
+	"github.com/qjpcpu/log"
+)
+
+func main() {
+	log.SetLogLevel(log.INFO)
+	log.Infof("this is  %s", "info log1")
+	log.Debugf("this is %s", "debug log1")
+	log.SetLogLevel(log.DEBUG)
+	log.Infof("this is  %s", "info log2")
+	log.Debugf("this is  %s", "debug log2")
+}
+#+END_SRC
+
+*** print log to file, auto rotate daily
+#+BEGIN_SRC go
+package main
+
+import (
+	"github.com/qjpcpu/log"
+)
+
+func main() {
+	log.InitLog(log.LogOption{
+	 	Level:   log.INFO,
+	 	LogFile: "./log/access.log",
+	})
+	log.SetLogLevel(log.INFO)
+	log.Infof("this is  %s", "info log1")
+	log.Debugf("this is %s", "debug log1")
+	log.SetLogLevel(log.DEBUG)
+	log.Infof("this is  %s", "info log2")
+	log.Debugf("this is  %s", "debug log2")
+}
+#+END_SRC

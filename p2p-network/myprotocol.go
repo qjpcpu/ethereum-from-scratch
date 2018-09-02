@@ -5,7 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"github.com/ethereum/go-ethereum/crypto"
-	ethlog "github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/p2p/nat"
@@ -17,13 +16,18 @@ import (
 	"time"
 )
 
-const messageId = 0
+type MessageType = uint64
+
+const (
+	MT_HelloWorld MessageType = iota
+	MT_FooBar
+)
 
 type Message string
 
-func MyProtocol() p2p.Protocol {
+func FooBarProtocol() p2p.Protocol {
 	return p2p.Protocol{
-		Name:    "MyProtocol",
+		Name:    "FooBarProtocol",
 		Version: 1,
 		Length:  2,
 		Run:     msgHandler,
@@ -86,20 +90,19 @@ func getPrivateKey() *ecdsa.PrivateKey {
 	return pk
 }
 
+var srv p2p.Server
+
 func main() {
 	parseArgs()
 	nodekey := getPrivateKey()
-	logger := ethlog.New()
-	logger.SetHandler(ethlog.StderrHandler)
-	srv := p2p.Server{
+	srv = p2p.Server{
 		Config: p2p.Config{
-			MaxPeers:   10,
-			PrivateKey: nodekey,
-			Name:       nodeName,
-			ListenAddr: port,
-			Protocols:  []p2p.Protocol{MyProtocol()},
-			NAT:        nat.Any(),
-			//Logger:         logger,
+			MaxPeers:       10,
+			PrivateKey:     nodekey,
+			Name:           nodeName,
+			ListenAddr:     port,
+			Protocols:      []p2p.Protocol{FooBarProtocol()},
+			NAT:            nat.Any(),
 			BootstrapNodes: bootstrapNodes(),
 		},
 	}
@@ -107,12 +110,12 @@ func main() {
 		fmt.Println(err)
 		os.Exit(1)
 	}
+	log.Info("started..", srv.NodeInfo().Enode)
 	ch := make(chan *p2p.PeerEvent)
 	srv.SubscribeEvents(ch)
-	log.Info("started..", srv.NodeInfo().Enode)
 	for {
 		select {
-		case <-time.After(20 * time.Second):
+		case <-time.After(60 * time.Second):
 			log.Infof("connected %d nodes", srv.PeerCount())
 		case pe := <-ch:
 			log.Info("PE", pe.Type, pe.Protocol, pe.Peer.String())
@@ -123,8 +126,8 @@ func main() {
 func msgHandler(peer *p2p.Peer, ws p2p.MsgReadWriter) error {
 	// send msg
 	log.Infof("new peer connected:%v", peer.String())
-	p2p.SendItems(ws, messageId, "hello new peer "+peer.Name())
-	p2p.SendItems(ws, messageId+1, "foo")
+	p2p.SendItems(ws, MT_HelloWorld, srv.NodeInfo().Name+":welcome "+peer.Name())
+	p2p.SendItems(ws, MT_FooBar, "foo")
 	for {
 		msg, err := ws.ReadMsg()
 		if err != nil {
@@ -143,7 +146,7 @@ func msgHandler(peer *p2p.Peer, ws p2p.MsgReadWriter) error {
 		log.Info("code:", msg.Code, "receiver at:", msg.ReceivedAt, "msg:", myMessage)
 		switch myMessage[0] {
 		case "foo":
-			err := p2p.SendItems(ws, messageId+1, "bar")
+			err := p2p.SendItems(ws, MT_FooBar, "bar")
 			if err != nil {
 				log.Errorf("send bar error:%v", err)
 				return err
